@@ -126,7 +126,6 @@ public:
         int pos_shadow_y = position.y + PLAYER_HEIGHT - 8;
         putimage_alpha(pos_shadow_x, pos_shadow_y, &img_shadow);
 
-        bool is_facing_left = false;
 		int dir_x = is_move_right - is_move_left;
 
         if (dir_x < 0) {
@@ -143,6 +142,11 @@ public:
             anim_right->Play(position.x, position.y, delta);
         }
     }
+
+    const POINT& GetPosition() const {
+        return position;
+    }
+
 private:
     const int PLAYER_SPEED = 5;
     const int PLAYER_WIDTH = 80;
@@ -158,6 +162,25 @@ private:
     bool is_move_down = false;
     bool is_move_left = false;
     bool is_move_right = false;
+	bool is_facing_left = false;
+};
+
+class Bullet {
+public:
+    POINT position = { 0, 0 };
+
+public:
+    Bullet() = default;
+    ~Bullet() = default;
+
+    void Draw() const {
+        setlinecolor(RGB(255, 155, 10));
+        setfillcolor(RGB(255, 75, 10));
+        fillcircle(position.x, position.y, RADIUS);
+    }
+
+private:
+    const int RADIUS = 10;
 };
 
 class Enemy {
@@ -195,6 +218,45 @@ public:
 		}
     }
 
+	bool CheckPlayerCollision(const Player& player) {
+        return false;
+	}
+
+	bool CheckBulletCollision(const Bullet& bullet) {
+		return false;
+	}
+
+	// Enemy朝向Player移动
+    void Move(const Player& player) {
+		const POINT& player_position = player.GetPosition();
+		int dir_x = player_position.x - position.x;
+		int dir_y = player_position.y - position.y;
+
+        if (dir_x < 0) is_facing_left = true;
+        else if (dir_x > 0) is_facing_left = false;
+
+		double len_dir = sqrt(dir_x * dir_x + dir_y * dir_y);
+        if (len_dir != 0) {
+            double normalized_x = dir_x / len_dir;
+            double normalized_y = dir_y / len_dir;
+            position.x += (int)(ENEMY_SPEED * normalized_x);
+            position.y += (int)(ENEMY_SPEED * normalized_y);
+        }
+    }
+
+	void Draw(int delta) {
+		int pos_shadow_x = position.x + (ENEMY_WIDTH / 2 - SHADOW_WIDTH / 2);
+		int pos_shadow_y = position.y + ENEMY_HEIGHT - 35;
+		putimage_alpha(pos_shadow_x, pos_shadow_y, &img_shadow);
+
+		if (is_facing_left == true) {
+			anim_left->Play(position.x, position.y, delta);
+		}
+		else {
+			anim_right->Play(position.x, position.y, delta);
+		}
+	}
+
     ~Enemy() {
 		delete anim_left;
         delete anim_right;
@@ -214,23 +276,13 @@ private:
 	bool is_facing_left = false;
 };
 
-class Bullet {
-public:
-    POINT position = { 0, 0 };
-
-public:
-    Bullet() = default;
-    ~Bullet() = default;
-
-    void Darw() const{
-		setlinecolor(RGB(255, 155, 10));
-		setfillcolor(RGB(255, 75, 10));
-		fillcircle(position.x, position.y, RADIUS);
+void TryGenerateEnemy(std::vector<Enemy*>& enemy_list) {
+	const int GENERATE_INTERVAL = 100; // 每秒生成一个敌人
+	static int timer = 0;
+    if ((++timer) % GENERATE_INTERVAL == 0) {
+		enemy_list.push_back(new Enemy());
     }
-
-private:
-	const int RADIUS = 10;
-};
+}
 
 int main(void) {
     initgraph(1280, 720);
@@ -239,6 +291,7 @@ int main(void) {
     ExMessage msg;
     IMAGE image_background;
     Player player;
+	std::vector<Enemy*> enemy_list;
 
     // 加载背景图
     loadimage(&image_background, _T("img/background.png"));
@@ -254,11 +307,16 @@ int main(void) {
         }
         
 		player.Move();
+		TryGenerateEnemy(enemy_list);
+        for (Enemy* enemy : enemy_list)
+			enemy->Move(player);
 
         cleardevice();
 
         putimage(0, 0, &image_background);
         player.Draw(1000 / 144);
+		for (Enemy* enemy : enemy_list)
+			enemy->Draw(1000 / 144);
 
         FlushBatchDraw();
 
