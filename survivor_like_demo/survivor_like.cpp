@@ -2,23 +2,10 @@
 #include <string>
 #include <vector>
 
-int index_current_anim = 0;
-
-const int PLAYER_ANIM_NUM = 6;
-const int PLAYER_SPEED = 3;
-const int PLAYER_WIDTH = 80;
-const int PLAYER_HEIGHT = 80;
-const int SHADOW_WIDTH = 32;
+#pragma comment(lib, "MSIMG32.LIB")
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
 
-IMAGE img_player_left[PLAYER_ANIM_NUM];
-IMAGE img_player_right[PLAYER_ANIM_NUM];
-IMAGE img_shadow;
-
-POINT player_pos = { 500, 500 };
-
-#pragma comment(lib, "MSIMG32.LIB")
 
 inline void putimage_alpha(int x, int y, IMAGE* img) {
     int w = img->getwidth();
@@ -26,18 +13,6 @@ inline void putimage_alpha(int x, int y, IMAGE* img) {
     AlphaBlend(GetImageHDC(NULL), x, y, w, h,
         GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
 }
-
-//此函数已弃用
-// void loadAnimation() {
-//    for (size_t i = 0; i < PLAYER_ANIM_NUM; i++) {
-//        std::wstring path = L"img/player_left_" + std::to_wstring(i) + L".png";
-//        loadimage(&img_player_left[i], path.c_str());
-//    }
-//    for (size_t i = 0; i < PLAYER_ANIM_NUM; i++) {
-//        std::wstring path = L"img/player_right_" + std::to_wstring(i) + L".png";
-//        loadimage(&img_player_right[i], path.c_str());
-//    }
-//}
 
 class Animation {
 public:
@@ -80,58 +55,21 @@ private:
     std::vector<IMAGE*> frame_list;
 };
 
-Animation anim_left_player(_T("img/player_left_%d.png"), 6, 45);
-Animation anim_right_player(_T("img/player_right_%d.png"), 6, 45);
-
-void DrawPlayer(int delta, int dir_x) {
-
-    int pos_shadow_x = player_pos.x + (PLAYER_WIDTH / 2 - SHADOW_WIDTH / 2);
-    int pos_shadow_y = player_pos.y + PLAYER_HEIGHT - 8;
-    putimage_alpha(pos_shadow_x, pos_shadow_y, &img_shadow);
-
-    static bool is_facing_left = false;
-    if (dir_x < 0) {
-        is_facing_left = true;
+class Player {
+public:
+    Player() {
+        loadimage(&img_shadow, _T("img/shadow_player.png"));
+		anim_left = new Animation(_T("img/player_left_%d.png"), 6, 45);
+		anim_right = new Animation(_T("img/player_right_%d.png"), 6, 45);
     }
-    else if (dir_x > 0) {
-        is_facing_left = false;
+    ~Player() {
+		delete anim_left;
+		delete anim_right;
     }
 
-    if (is_facing_left == true) {
-        anim_left_player.Play(player_pos.x, player_pos.y, delta);
-    }
-    else {
-        anim_right_player.Play(player_pos.x, player_pos.y, delta);
-    }
-}
-
-int main(void) {
-    initgraph(1280, 720);
-
-    bool running = true;
-    ExMessage msg;
-    IMAGE image_background;
-
-    bool is_move_up = false;
-    bool is_move_down = false;
-    bool is_move_left = false;
-    bool is_move_right = false;
-
-    //更新了新的函数实现
-    // loadAnimation()（已弃用）;
-    // 加载背景图
-    loadimage(&image_background, _T("img/background.png"));
-    // 加载阴影
-    loadimage(&img_shadow, _T("img/shadow_player.png"));
-
-    BeginBatchDraw();
-
-    while (running) {
-        DWORD start_time = GetTickCount();
-
-        while (peekmessage(&msg)) {
-            // 处理消息
-            if (msg.message == WM_KEYDOWN) {
+    void ProcessEvent(const ExMessage& msg) {
+        switch (msg.message) {
+            case WM_KEYDOWN:
                 switch (msg.vkcode) {
                 case VK_UP:
                     is_move_up = true;
@@ -146,8 +84,9 @@ int main(void) {
                     is_move_right = true;
                     break;
                 }
-            }
-			else if (msg.message = WM_KEYUP) {
+                break;
+
+			case WM_KEYUP:
 				switch (msg.vkcode) {
 				case VK_UP:
 					is_move_up = false;
@@ -162,40 +101,164 @@ int main(void) {
 					is_move_right = false;
 					break;
 				}
-			}
+                break;
         }
+    }
 
-		if (is_move_up) player_pos.y -= PLAYER_SPEED;
-		if (is_move_down) player_pos.y += PLAYER_SPEED;
-		if (is_move_left) player_pos.x -= PLAYER_SPEED;
-		if (is_move_right) player_pos.x += PLAYER_SPEED;
-
-        static int counter = 0;
-        if (++counter % 5 == 0)
-            index_current_anim++;
-
-        // 动画的循环播放
-        index_current_anim %= PLAYER_ANIM_NUM;
-
+    void Move() {
         int dir_x = is_move_right - is_move_left;
         int dir_y = is_move_down - is_move_up;
         double len_dir = sqrt(dir_x * dir_x + dir_y * dir_y);
         if (len_dir != 0) {
             double normalized_x = dir_x / len_dir;
             double normalized_y = dir_y / len_dir;
-            player_pos.x += (int)(PLAYER_SPEED * normalized_x);
-            player_pos.y += (int)(PLAYER_SPEED * normalized_y);
+            position.x += (int)(PLAYER_SPEED * normalized_x);
+            position.y += (int)(PLAYER_SPEED * normalized_y);
         }
-        if (player_pos.x < 0) player_pos.x = 0;
-        if (player_pos.y < 0) player_pos.y = 0;
-        if (player_pos.x + PLAYER_WIDTH > WINDOW_WIDTH) player_pos.x = WINDOW_WIDTH - PLAYER_WIDTH;
-        if (player_pos.y + PLAYER_HEIGHT > WINDOW_HEIGHT) player_pos.y = WINDOW_HEIGHT - PLAYER_HEIGHT;
+        if (position.x < 0) position.x = 0;
+        if (position.y < 0) position.y = 0;
+        if (position.x + PLAYER_WIDTH > WINDOW_WIDTH) position.x = WINDOW_WIDTH - PLAYER_WIDTH;
+        if (position.y + PLAYER_HEIGHT > WINDOW_HEIGHT) position.y = WINDOW_HEIGHT - PLAYER_HEIGHT;
+    }
+
+    void Draw(int delta) {
+        int pos_shadow_x = position.x + (PLAYER_WIDTH / 2 - SHADOW_WIDTH / 2);
+        int pos_shadow_y = position.y + PLAYER_HEIGHT - 8;
+        putimage_alpha(pos_shadow_x, pos_shadow_y, &img_shadow);
+
+        bool is_facing_left = false;
+		int dir_x = is_move_right - is_move_left;
+
+        if (dir_x < 0) {
+            is_facing_left = true;
+        }
+        else if (dir_x > 0) {
+            is_facing_left = false;
+        }
+
+        if (is_facing_left == true) {
+            anim_left->Play(position.x, position.y, delta);
+        }
+        else {
+            anim_right->Play(position.x, position.y, delta);
+        }
+    }
+private:
+    const int PLAYER_SPEED = 5;
+    const int PLAYER_WIDTH = 80;
+    const int PLAYER_HEIGHT = 80;
+    const int SHADOW_WIDTH = 32;
+
+private:
+    IMAGE img_shadow;
+	Animation* anim_left;
+	Animation* anim_right;
+	POINT position = { 500, 500 };
+    bool is_move_up = false;
+    bool is_move_down = false;
+    bool is_move_left = false;
+    bool is_move_right = false;
+};
+
+class Enemy {
+public:
+    Enemy() {
+		loadimage(&img_shadow, _T("img/shadow_enemy.png"));
+		anim_left = new Animation(_T("img/enemy_left_%d.png"), 6, 45);
+		anim_right = new Animation(_T("img/enemy_right_%d.png"), 6, 45);
+
+        enum class SpawnEdge {
+			TOP = 0 ,
+			BOTTOM,
+			LEFT,
+			RIGHT
+        };
+
+		SpawnEdge edge = (SpawnEdge)(rand() % 4);
+		switch (edge) {
+		case SpawnEdge::TOP:
+			position.x = rand() % (WINDOW_WIDTH - ENEMY_WIDTH);
+			position.y = -ENEMY_HEIGHT;
+			break;
+		case SpawnEdge::BOTTOM:
+			position.x = rand() % (WINDOW_WIDTH - ENEMY_WIDTH);
+			position.y = WINDOW_HEIGHT;
+			break;
+		case SpawnEdge::LEFT:
+			position.x = -ENEMY_WIDTH;
+			position.y = rand() % (WINDOW_HEIGHT - ENEMY_HEIGHT);
+			break;
+		case SpawnEdge::RIGHT:
+			position.x = WINDOW_WIDTH;
+			position.y = rand() % (WINDOW_HEIGHT - ENEMY_HEIGHT);
+			break;
+		}
+    }
+
+    ~Enemy() {
+		delete anim_left;
+        delete anim_right;
+    };
+
+private:
+	const int ENEMY_SPEED = 2;
+	const int ENEMY_WIDTH = 80;
+	const int ENEMY_HEIGHT = 80;
+	const int SHADOW_WIDTH = 48;
+
+private:
+	IMAGE img_shadow;
+	Animation* anim_left;
+	Animation* anim_right;
+	POINT position = { 0, 0 };
+	bool is_facing_left = false;
+};
+
+class Bullet {
+public:
+    POINT position = { 0, 0 };
+
+public:
+    Bullet() = default;
+    ~Bullet() = default;
+
+    void Darw() const{
+		setlinecolor(RGB(255, 155, 10));
+		setfillcolor(RGB(255, 75, 10));
+		fillcircle(position.x, position.y, RADIUS);
+    }
+
+private:
+	const int RADIUS = 10;
+};
+
+int main(void) {
+    initgraph(1280, 720);
+
+    bool running = true;
+    ExMessage msg;
+    IMAGE image_background;
+    Player player;
+
+    // 加载背景图
+    loadimage(&image_background, _T("img/background.png"));
+
+    BeginBatchDraw();
+
+    while (running) {
+        DWORD start_time = GetTickCount();
+
+        while (peekmessage(&msg)) {
+            // 处理消息
+			player.ProcessEvent(msg);
+        }
+        
+		player.Move();
 
         cleardevice();
 
         putimage(0, 0, &image_background);
-        /*putimage_alpha(player_pos.x, player_pos.y, &img_player_left[index_current_anim]);*/
-        DrawPlayer(1000 / 144, is_move_right - is_move_left);
+        player.Draw(1000 / 144);
 
         FlushBatchDraw();
 
