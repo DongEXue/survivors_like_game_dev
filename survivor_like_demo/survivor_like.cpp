@@ -36,7 +36,7 @@ public:
             delete(frame_list[i]);
         }
     }
-    /*
+    /**
     @param delta:距离上次调用Play函数过去了多久
     */
     void Play(int x, int y, int delta) {
@@ -56,6 +56,11 @@ private:
 };
 
 class Player {
+
+public:
+    const int PLAYER_WIDTH = 80;
+    const int PLAYER_HEIGHT = 80;
+
 public:
     Player() {
         loadimage(&img_shadow, _T("img/shadow_player.png"));
@@ -149,8 +154,8 @@ public:
 
 private:
     const int PLAYER_SPEED = 5;
-    const int PLAYER_WIDTH = 80;
-    const int PLAYER_HEIGHT = 80;
+    //const int PLAYER_WIDTH = 80;
+    //const int PLAYER_HEIGHT = 80;
     const int SHADOW_WIDTH = 32;
 
 private:
@@ -219,11 +224,17 @@ public:
     }
 
 	bool CheckPlayerCollision(const Player& player) {
-        return false;
+        POINT check_position = { position.x + ENEMY_WIDTH / 2 , position.y + ENEMY_HEIGHT / 2 };
+        bool is_overlap_x = check_position.x >= player.GetPosition().x && check_position.x <= player.GetPosition().x + player.PLAYER_WIDTH;
+        bool is_overlap_y = check_position.y >= player.GetPosition().y && check_position.y <= player.GetPosition().y + player.PLAYER_HEIGHT;
+        return is_overlap_x && is_overlap_y;
 	}
 
 	bool CheckBulletCollision(const Bullet& bullet) {
-		return false;
+        //子弹的碰撞检测采用把子弹等效于点，判断该点是否在敌人矩形内
+        bool is_overlap_x = bullet.position.x >= position.x && bullet.position.x <= position.x + ENEMY_WIDTH;
+        bool is_overlap_y = bullet.position.y >= position.y && bullet.position.y <= position.y + ENEMY_HEIGHT;
+        return is_overlap_x && is_overlap_y;
 	}
 
 	// Enemy朝向Player移动
@@ -317,6 +328,14 @@ int main(void) {
         player.Draw(1000 / 144);
 		for (Enemy* enemy : enemy_list)
 			enemy->Draw(1000 / 144);
+
+        for (Enemy* enemy : enemy_list) {
+            if (enemy->CheckPlayerCollision(player)) {
+                MessageBox(GetHWnd(), _T("扣“1”进入战败CG"), _T("Game Over"), MB_OK);
+                running = false;
+                break;
+            }
+        }
 
         FlushBatchDraw();
 
