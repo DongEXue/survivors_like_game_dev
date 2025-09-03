@@ -14,11 +14,10 @@ inline void putimage_alpha(int x, int y, IMAGE* img) {
         GetImageHDC(img), 0, 0, w, h, { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA });
 }
 
-class Animation {
+//引入享元模式的设计模式优化程序的资源素材加载
+class Atlas {
 public:
-    Animation(LPCTSTR path, int num, int interval) {
-        interval_ms = interval;
-
+    Atlas(LPCTSTR path, int num) {
         //加载图片，因为素材中的命名规律遂将路径参数作为字符串格式化的模板
         TCHAR path_file[256];
         for (size_t i = 0; i < num; i++) {
@@ -30,29 +29,48 @@ public:
         }
     }
 
-    //动画对象的析构函数
-    ~Animation() {
+    ~Atlas() {
         for (size_t i = 0; i < frame_list.size(); i++) {
             delete(frame_list[i]);
         }
     }
+
+public:
+    std::vector<IMAGE*> frame_list;
+};
+
+Atlas* atlas_player_left;
+Atlas* atlas_player_right;
+Atlas* atlas_enemy_left;
+Atlas* atlas_enemy_right;
+
+class Animation {
+public:
+    Animation(Atlas* atlas, int interval) {
+        anim_atlas = atlas;
+        interval_ms = interval;
+    }
+
+    //因为Atlas时Animation之间共享的公共资产，故万万不可在析构函数中delete Atlas指针
+    ~Animation() = default;
+
     /**
     @param delta:距离上次调用Play函数过去了多久
     */
     void Play(int x, int y, int delta) {
         timer += delta;
         if (timer >= interval_ms) {
-            index_frame = (index_frame + 1) % frame_list.size();
+            index_frame = (index_frame + 1) % anim_atlas -> frame_list.size();
             timer = 0;
         }
 
-        putimage_alpha(x, y, frame_list[index_frame]);
+        putimage_alpha(x, y, anim_atlas -> frame_list[index_frame]);
     }
 private:
     int timer = 0;  //动画计时器
     int index_frame = 0;    //动画帧索引
     int interval_ms = 0;    //帧间隔
-    std::vector<IMAGE*> frame_list;
+    Atlas* anim_atlas;
 };
 
 class Player {
@@ -64,13 +82,10 @@ public:
 public:
     Player() {
         loadimage(&img_shadow, _T("img/shadow_player.png"));
-		anim_left = new Animation(_T("img/player_left_%d.png"), 6, 45);
-		anim_right = new Animation(_T("img/player_right_%d.png"), 6, 45);
+		anim_left = new Animation(atlas_player_left, 45);
+		anim_right = new Animation(atlas_player_right, 45);
     }
-    ~Player() {
-		delete anim_left;
-		delete anim_right;
-    }
+    ~Player() = default;
 
     void ProcessEvent(const ExMessage& msg) {
         switch (msg.message) {
@@ -193,8 +208,8 @@ class Enemy {
 public:
     Enemy() {
 		loadimage(&img_shadow, _T("img/shadow_enemy.png"));
-		anim_left = new Animation(_T("img/enemy_left_%d.png"), 6, 45);
-		anim_right = new Animation(_T("img/enemy_right_%d.png"), 6, 45);
+		anim_left = new Animation(atlas_enemy_left, 45);
+		anim_right = new Animation(atlas_enemy_right, 45);
 
         enum class SpawnEdge {
 			TOP = 0 ,
@@ -277,10 +292,7 @@ public:
 		}
 	}
 
-    ~Enemy() {
-		delete anim_left;
-        delete anim_right;
-    };
+    ~Enemy() = default;
 
 private:
 	const int ENEMY_SPEED = 2;
@@ -329,6 +341,11 @@ void DrawPlayerScore(int score) {
 
 int main(void) {
     initgraph(1280, 720);
+
+    atlas_player_left = new Atlas(_T("img/player_left_%d.png"), 6);
+    atlas_player_right = new Atlas(_T("img/player_right_%d.png"), 6);
+    atlas_enemy_left = new Atlas(_T("img/enemy_left_%d.png"), 6);
+    atlas_enemy_right = new Atlas(_T("img/enemy_right_%d.png"), 6);
 
     int score = 0;
     bool running = true;
@@ -405,6 +422,11 @@ int main(void) {
             Sleep(1000 / 144 - delta_time);
         }
     }
+
+    delete atlas_player_left;
+    delete atlas_player_right;
+    delete atlas_enemy_left;
+    delete atlas_enemy_right;
 
     EndBatchDraw();
 
